@@ -4,35 +4,40 @@ const util = require('util');
 const exec = util.promisify(require('child_process').exec);
 const fs = require('fs');
 
+
 // --- CONFIGURATION ---
 const debug = false;
 const debug_data = [];
 
-const course_url = 'YOUR_COURSE_URL_HERE';
-const subtitle_lang = 'en';
+const course_url = "https://www.domestika.org/it/courses/1697-tecniche-fondamentali-di-pressatura-botanica" + "/course";
+const subtitle_lang = 'it';
 //Specifiy your OS either as 'win' for Windows machines or 'mac' for MacOS/Linux machines
-const machine_os = 'YOUR_OS_HERE';
+const machine_os = 'mac';
+
+const cookiesFile = JSON.parse(fs.readFileSync('./cookies.json').toString());
 
 //Cookie used to retreive video information
 const cookies = [
     {
         name: '_domestika_session',
-        value: 'YOUR_COOKIE_HERE',
+        value: cookiesFile.find((cookie) => cookie.name === '_domestika_session').value,
         domain: 'www.domestika.org',
     },
 ];
 
 //Credentials needed for the access token to get the final project
-const _credentials_ = 'YOUR_CREDENTIALS_HERE';
+const _credentials_ = cookiesFile.find((cookie) => cookie.name === '_credentials_').value;
 // --- END CONFIGURATION ---
 
 //Check if the N_m3u8DL-RE binary exists, throw error if not
-const executable_name = machine_os === 'win' ? 'N_m3u8DL-RE.exe' : 'N_m3u8DL-RE';
-if (fs.existsSync(executable_name)) {
-    scrapeSite();
-} else {
-    throw Error('N_m3u8DL-RE binary not found! Download the Binary here: https://github.com/nilaoda/N_m3u8DL-RE/releases');
-}
+// const executable_name = machine_os === 'win' ? 'N_m3u8DL-RE.exe' : 'N_m3u8DL-RE';
+// if (fs.existsSync(executable_name)) {
+//     scrapeSite();
+// } else {
+//     throw Error('N_m3u8DL-RE binary not found! Download the Binary here: https://github.com/nilaoda/N_m3u8DL-RE/releases');
+// }
+
+scrapeSite();
 
 //Get access token from the credentials
 const regex_token = /accessToken\":\"(.*?)\"/gm;
@@ -129,7 +134,7 @@ async function scrapeSite() {
                     title: 'Final project',
                     videoData: [
                         {
-                            playbackURL: final_data.data.attributes.playbackUrl,
+                            playbackURL: final_data.data.attributes?.playbackUrl,
                             title: 'Final project',
                             section: 'Final project',
                         },
@@ -158,7 +163,7 @@ async function scrapeSite() {
     await Promise.all(downloadPromises);
 
     await page.close();
-    await browser.close();
+    // await browser.close();
 
     if (debug) {
         fs.writeFileSync('log.json', JSON.stringify(debug_data));
@@ -238,8 +243,10 @@ async function downloadVideo(vData, title, unitTitle, index) {
             let log = await exec(`N_m3u8DL-RE -sv res="1080*":codec=hvc1:for=best "${vData.playbackURL}" --save-dir "domestika_courses/${title}/${vData.section}/${unitTitle}" --save-name "${index}_${vData.title.trimEnd()}"`, options);
             let log2 = await exec(`N_m3u8DL-RE --auto-subtitle-fix --sub-format SRT --select-subtitle lang="${subtitle_lang}":for=all "${vData.playbackURL}" --save-dir "domestika_courses/${title}/${vData.section}/${unitTitle}" --save-name "${index}_${vData.title.trimEnd()}"`, options);
         } else {
-            let log = await exec(`./N_m3u8DL-RE -sv res="1080*":codec=hvc1:for=best "${vData.playbackURL}" --save-dir "domestika_courses/${title}/${vData.section}/${unitTitle}" --save-name "${index}_${vData.title.trimEnd()}"`);
-            let log2 = await exec(`./N_m3u8DL-RE --auto-subtitle-fix --sub-format SRT --select-subtitle lang="${subtitle_lang}":for=all "${vData.playbackURL}" --save-dir "domestika_courses/${title}/${vData.section}/${unitTitle}" --save-name "${index}_${vData.title.trimEnd()}"`);
+            // let log = await exec(`./N_m3u8DL-RE -sv res="1080*":codec=hvc1:for=best "${vData.playbackURL}" --save-dir "domestika_courses/${title}/${vData.section}/${unitTitle}" --save-name "${index}_${vData.title.trimEnd()}"`);
+            // let log2 = await exec(`./N_m3u8DL-RE --auto-subtitle-fix --sub-format SRT --select-subtitle lang="${subtitle_lang}":for=all "${vData.playbackURL}" --save-dir "domestika_courses/${title}/${vData.section}/${unitTitle}" --save-name "${index}_${vData.title.trimEnd()}"`);
+            //
+            let log = await exec(`yt-dlp --output "${index}_${vData.title.trimEnd()}" --paths "domestika_courses/${title}/${vData.section}/${unitTitle}" --sub-langs "en,${subtitle_lang}" --embed-subs "${vData.playbackURL}"`);
         }
 
         if (debug) {
