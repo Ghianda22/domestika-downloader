@@ -1,14 +1,13 @@
 import puppeteer, {Browser, Cookie, Page} from 'puppeteer';
 import * as cheerio from 'cheerio';
-import { promisify } from 'util';
-import { exec as execCallback, ExecOptions } from 'child_process';
+import { exec , ExecOptions } from 'child_process';
 import fs from 'fs';
 
-const exec = promisify(execCallback);
 
 // --- CONFIGURATION ---
 const DEBUG = false;
-const LIST_URL = "https://www.domestika.org/it/6bnxw6kzvs/courses_lists/4116192-ale2";
+// Url to the list to be downloaded
+const LIST_URL = "https://www.domestika.org/LANG/ACCOUNT/courses_lists/LIST_NAME";
 const SUBTITLE_LANG = 'it';
 const MACHINE_OS: 'mac'|'win' = 'mac';
 
@@ -157,7 +156,12 @@ async function downloadVideos(
                 : `yt-dlp --output "${index}_${video.title}" --paths "${directory}" --sub-langs "en,${SUBTITLE_LANG}" --embed-subs "${video.playbackURL}"`;
 
         try {
-            await exec(command, options);
+            console.log(`Downloading ${index}_${video.title}`);
+            const downloadProcess = exec(command, options);
+            downloadProcess.stdout.on('data', function(data) {
+                if (DEBUG) console.log(data);
+            });
+
             if (DEBUG) console.log(`Downloaded: ${video.title}`);
         } catch (error) {
             console.error(`Error downloading video: ${video.title}`, error);
