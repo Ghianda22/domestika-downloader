@@ -9,7 +9,9 @@ const fs = require('fs');
 const debug = false;
 const debug_data = [];
 
-const course_url = "https://www.domestika.org/it/courses/1697-tecniche-fondamentali-di-pressatura-botanica" + "/course";
+const listUrl = "https://www.domestika.org/it/6bnxw6kzvs/courses_lists/4114723-da-vedere-peffozza";
+// const course_url = "https://www.domestika.org/it/courses/4592-ikebana-composizione-floreale-per-principianti/course";
+// const courseUrl = "https://www.domestika.org/it/courses/" + course.id + "-" + course.attributes.title.toLowerCase().replace(/ /g, "-").replace(/[^a-zA-Z0-9-]/g, "");
 const subtitle_lang = 'it';
 //Specifiy your OS either as 'win' for Windows machines or 'mac' for MacOS/Linux machines
 const machine_os = 'mac';
@@ -29,21 +31,50 @@ const cookies = [
 const _credentials_ = cookiesFile.find((cookie) => cookie.name === '_credentials_').value;
 // --- END CONFIGURATION ---
 
-//Check if the N_m3u8DL-RE binary exists, throw error if not
-// const executable_name = machine_os === 'win' ? 'N_m3u8DL-RE.exe' : 'N_m3u8DL-RE';
-// if (fs.existsSync(executable_name)) {
-//     scrapeSite();
-// } else {
-//     throw Error('N_m3u8DL-RE binary not found! Download the Binary here: https://github.com/nilaoda/N_m3u8DL-RE/releases');
-// }
 
-scrapeSite();
+getAllCourses();
 
 //Get access token from the credentials
-const regex_token = /accessToken\":\"(.*?)\"/gm;
-const access_token = regex_token.exec(decodeURI(_credentials_))[1];
+// const regex_token = /\"accessToken\":\"(.*?)\"/gm;
+// const access_token = regex_token.exec(decodeURI(_credentials_));
 
-async function scrapeSite() {
+async function getAllCourses() {
+    const browser = await puppeteer.launch({ headless: true });
+    const page = await browser.newPage();
+    page.setDefaultNavigationTimeout(0);
+    await page.setCookie(...cookies);
+
+    await page.setRequestInterception(true);
+
+    page.on('request', (req) => {
+        if (req.resourceType() == 'stylesheet' || req.resourceType() == 'font' || req.resourceType() == 'image') {
+            req.abort();
+        } else {
+            req.continue();
+        }
+    });
+
+    await page.goto(listUrl);
+    const html = await page.content();
+    const $ = cheerio.load(html);
+
+    const coursesLinksEl = $('h3.o-course-card__title a');
+    console.log(coursesLinksEl.length + ' Courses Detected');
+    const coursesLinks = coursesLinksEl.map((i, element) => $(element).attr('href'));
+    const cousresTitles = coursesLinksEl.map((i, element) => $(element).text());
+
+    const coursePromises = [];
+
+    coursesLinks.each((index, courseLink) => {
+        console.log('Scraping Course: ' + cousresTitles[index]);
+        coursePromises.push(scrapeSite(courseLink + '/course'));
+    });
+
+    await Promise.all(coursePromises);
+    console.log('All Courses Downloaded');
+}
+
+async function scrapeSite(course_url) {
     //Scrape site for links to videos
     const browser = await puppeteer.launch({ headless: true });
     const page = await browser.newPage();
@@ -68,7 +99,10 @@ async function scrapeSite() {
 
     let allVideos = [];
     let units = $('h4.h2.unit-item__title a');
-    let title = $('h1.course-header-new__title')
+    let titleEl = $('h1.course-header-new__title')
+        ? $('h1.course-header-new__title')
+        : $('.course-header-new__title-wrapper h1');
+    let title = titleEl
         .text()
         .trim()
         .replace(/[/\\?%*:|"<>]/g, '-');
@@ -120,29 +154,29 @@ async function scrapeSite() {
 
     console.log('All Videos Found');
 
-    if (final_project_id != undefined && final_project_id != null) {
-        console.log('Fetching Final Project');
-        let final_data = await fetchFromApi(`https://api.domestika.org/api/courses/${final_project_id}/final-project?with_server_timing=true`, 'finalProject.v1', access_token);
-
-        if (final_data && final_data.data) {
-            let final_video_data = final_data.data.relationships;
-            if (final_video_data != undefined && final_video_data.video != undefined && final_video_data.video.data != undefined && final_data.data.relationships.video.data != null) {
-                final_project_id = final_video_data.video.data.id;
-                final_data = await fetchFromApi(`https://api.domestika.org/api/videos/${final_project_id}?with_server_timing=true`, 'video.v1', access_token);
-
-                allVideos.push({
-                    title: 'Final project',
-                    videoData: [
-                        {
-                            playbackURL: final_data.data.attributes?.playbackUrl,
-                            title: 'Final project',
-                            section: 'Final project',
-                        },
-                    ],
-                });
-            }
-        }
-    }
+    // if (final_project_id != undefined && final_project_id != null) {
+    //     console.log('Fetching Final Project');
+    //     let final_data = await fetchFromApi(`https://api.domestika.org/api/courses/${final_project_id}/final-project?with_server_timing=true`, 'finalProject.v1', access_token);
+    //
+    //     if (final_data && final_data.data) {
+    //         let final_video_data = final_data.data.relationships;
+    //         if (final_video_data != undefined && final_video_data.video != undefined && final_video_data.video.data != undefined && final_data.data.relationships.video.data != null) {
+    //             final_project_id = final_video_data.video.data.id;
+    //             final_data = await fetchFromApi(`https://api.domestika.org/api/videos/${final_project_id}?with_server_timing=true`, 'video.v1', access_token);
+    //
+    //             allVideos.push({
+    //                 title: 'Final project',
+    //                 videoData: [
+    //                     {
+    //                         playbackURL: final_data.data.attributes?.playbackUrl,
+    //                         title: 'Final project',
+    //                         section: 'Final project',
+    //                     },
+    //                 ],
+    //             });
+    //         }
+    //     }
+    // }
 
     //Loop through all files and download them
     let count = 0;
@@ -170,7 +204,7 @@ async function scrapeSite() {
         console.log('Log File Saved');
     }
 
-    console.log('All Videos Downloaded');
+    console.log('Course downloaded: ' + title);
 }
 
 async function getInitialProps(url, page) {
