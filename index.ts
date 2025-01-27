@@ -4,6 +4,7 @@ import { exec , ExecOptions } from 'child_process';
 import fs from 'fs';
 import puppeteer from 'puppeteer-extra'
 import StealthPlugin from 'puppeteer-extra-plugin-stealth'
+import AnonymizeUAPlugin from 'puppeteer-extra-plugin-anonymize-ua'
 
 // --- CONFIGURATION ---
 const DEBUG = false;
@@ -19,7 +20,7 @@ main().then(() => process.exit(0));
 
 /** Main function to orchestrate the process */
 async function main(): Promise<void> {
-    const browser = await puppeteer.use(StealthPlugin()).launch({ headless: true });
+    const browser = await puppeteer.use(StealthPlugin()).use(AnonymizeUAPlugin()).launch({ headless: false });
     const page = await setupPage(browser);
 
     await page.goto(LIST_URL);
