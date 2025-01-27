@@ -1,8 +1,9 @@
-import puppeteer, {Browser, Cookie, Page} from 'puppeteer';
+import  {Browser, Cookie, Page} from 'puppeteer';
 import * as cheerio from 'cheerio';
 import { exec , ExecOptions } from 'child_process';
 import fs from 'fs';
-
+import puppeteer from 'puppeteer-extra'
+import StealthPlugin from 'puppeteer-extra-plugin-stealth'
 
 // --- CONFIGURATION ---
 const DEBUG = false;
@@ -14,11 +15,11 @@ const MACHINE_OS: 'mac'|'win' = 'mac';
 const COOKIES: Cookie[] = loadCookies('./cookies.json');
 // --- END CONFIGURATION ---
 
-main();
+main().then(() => process.exit(0));
 
 /** Main function to orchestrate the process */
 async function main(): Promise<void> {
-    const browser = await puppeteer.launch({ headless: true });
+    const browser = await puppeteer.use(StealthPlugin()).launch({ headless: true });
     const page = await setupPage(browser);
 
     await page.goto(LIST_URL);
